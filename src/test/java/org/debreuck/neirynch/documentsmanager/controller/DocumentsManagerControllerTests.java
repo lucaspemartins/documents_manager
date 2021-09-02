@@ -2,25 +2,28 @@ package org.debreuck.neirynch.documentsmanager.controller;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.debreuck.neirynch.documentsmanager.model.Rendering;
 import org.debreuck.neirynch.documentsmanager.model.Report;
 import org.debreuck.neirynch.documentsmanager.model.Summary;
 import org.debreuck.neirynch.documentsmanager.service.DocumentManagerService;
+import org.debreuck.neirynch.documentsmanager.service.FileService;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,78 +38,10 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-
 class DocumentsManagerControllerTests {
 
 	private static Logger LOG = Logger.getLogger(DocumentsManagerControllerTests.class.getName());
 	private static final String EXCEPTION_MESSAGE = "Json invalid!";
-	private static String SAMPLE_ANALYZED_LOG_RESPONSE = "{\n" + 
-			"    \"rendering\": [\n" + 
-			"        {\n" + 
-			"            \"document\": 114466,\n" + 
-			"            \"page\": 0,\n" + 
-			"            \"uid\": \"1286373785873-3536\",\n" + 
-			"            \"start\": [\n" + 
-			"                \"2010-10-06T09:03:05.869\"\n" + 
-			"            ],\n" + 
-			"            \"get\": [\n" + 
-			"                \"2010-10-06T09:03:06.547\"\n" + 
-			"            ]\n" + 
-			"        },\n" + 
-			"        {\n" + 
-			"            \"document\": 114273,\n" + 
-			"            \"page\": 0,\n" + 
-			"            \"uid\": \"1286373837895-7889\",\n" + 
-			"            \"start\": [\n" + 
-			"                \"2010-10-06T09:03:57.879\",\n" + 
-			"                \"2010-10-06T09:03:58.214\"\n" + 
-			"            ],\n" + 
-			"            \"get\": [\n" + 
-			"                \"2010-10-06T09:03:59.79\"\n" + 
-			"            ]\n" + 
-			"        },\n" + 
-			"        {\n" + 
-			"            \"document\": 114466,\n" + 
-			"            \"page\": 0,\n" + 
-			"            \"uid\": \"1286373806777-5552\",\n" + 
-			"            \"start\": [\n" + 
-			"                \"2010-10-06T09:03:26.774\"\n" + 
-			"            ],\n" + 
-			"            \"get\": [\n" + 
-			"                \"2010-10-06T09:03:27.985\"\n" + 
-			"            ]\n" + 
-			"        },\n" + 
-			"        {\n" + 
-			"            \"document\": 114273,\n" + 
-			"            \"page\": 1,\n" + 
-			"            \"uid\": \"1286373841290-1204\",\n" + 
-			"            \"start\": [\n" + 
-			"                \"2010-10-06T09:04:01.287\"\n" + 
-			"            ],\n" + 
-			"            \"get\": []\n" + 
-			"        },\n" + 
-			"        {\n" + 
-			"            \"document\": 114466,\n" + 
-			"            \"page\": 0,\n" + 
-			"            \"uid\": \"1286373733634-5423\",\n" + 
-			"            \"start\": [\n" + 
-			"                \"2010-10-06T09:02:13.631\"\n" + 
-			"            ],\n" + 
-			"            \"get\": [\n" + 
-			"                \"2010-10-06T09:02:14.825\"\n" + 
-			"            ]\n" + 
-			"        }\n" + 
-			"    ],\n" + 
-			"    \"summary\": {\n" + 
-			"        \"count\": 5,\n" + 
-			"        \"duplicates\": 1,\n" + 
-			"        \"unnecessary\": 1\n" + 
-			"    }\n" + 
-			"}";
 	
 	private MultipartFile logFileMock; 
 	private Report reportMock;
@@ -116,6 +51,9 @@ class DocumentsManagerControllerTests {
 
 	@Mock
 	private DocumentManagerService documentManagerService;
+	
+	@Mock
+	private FileService fileService;
 	
 	@BeforeEach
 	public void init() {
@@ -180,19 +118,6 @@ class DocumentsManagerControllerTests {
 
 	@Test
 	void analyzeSampleLog() throws IOException {
-		ObjectMapper mapper = JsonMapper.builder()
-		        .findAndAddModules()
-		        .build();
-		String jsonInString = SAMPLE_ANALYZED_LOG_RESPONSE;
-		Report obj = null;
-		try {
-			obj = mapper.readValue(jsonInString, Report.class);
-		} catch (JsonMappingException e) {
-			LOG.error(e.getMessage());
-			e.printStackTrace();
-		} catch (JsonProcessingException e) {
-			LOG.error(e.getMessage());
-		}
 		Mockito.when(documentManagerService.analyzeDocument(Mockito.any(InputStream.class))).thenReturn(reportMock);
 		Summary summary = new Summary();
 		summary.setCount(5L);
@@ -200,13 +125,24 @@ class DocumentsManagerControllerTests {
 		summary.setUnnecessary(1L);
 		reportMock.setSummary(summary);
 		Mockito.when(documentManagerService.summarize(Mockito.any(Report.class))).thenReturn(reportMock);
-		List<Rendering> objRenderingList = new ArrayList<Rendering>(obj.getRendering());
-		objRenderingList = objRenderingList.stream().sorted().collect(Collectors.toList());
-		ResponseEntity<Report> response = documentManagerController.analyzeDocument(logFileMock);
-		Report responseBody = response.getBody();
-		List<Rendering> actualRenderingList = new ArrayList<Rendering>(responseBody.getRendering());
-		actualRenderingList = actualRenderingList.stream().sorted().collect(Collectors.toList());
-		Assert.assertEquals(objRenderingList, actualRenderingList);
+		ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+		ObjectOutputStream outputStream;
+		try {
+			outputStream = new ObjectOutputStream(byteArray);
+			outputStream.writeObject(reportMock);
+			outputStream.flush();
+			outputStream.close();
+		} catch (IOException e) {
+			LOG.error(e.getMessage());
+		}
+		byte[] byteArrayReport = byteArray.toByteArray();
+		Mockito.when(fileService.createFile(Mockito.any(Object.class))).thenReturn(byteArrayReport);
+		File responseFile = new File("fileConverted");
+		FileUtils.writeByteArrayToFile(responseFile, byteArrayReport);
+		Mockito.when(fileService.convertByteArrayToFile(Mockito.any(byte[].class))).thenReturn(responseFile);
+		Mockito.when(fileService.zipFile(Mockito.any(File.class))).thenReturn(byteArrayReport);
+		ResponseEntity<Object> response = documentManagerController.analyzeDocument(logFileMock);
+		Assert.assertTrue(response.getBody() instanceof byte[]);
 		Assert.assertEquals(HttpStatus.OK, response.getStatusCode());
 	}
 

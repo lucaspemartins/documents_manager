@@ -1,0 +1,53 @@
+{
+	"variables": [],
+	"info": {
+		"name": "DocumentsManager",
+		"_postman_id": "2a64f2ea-9771-b02e-91fe-61bbcd5e66bb",
+		"description": "",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Analyze Document 400",
+			"request": {
+				"url": "{{server}}/document/analyze",
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "logFile",
+							"value": "",
+							"description": "",
+							"type": "file"
+						}
+					]
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Analyze Document 200",
+			"request": {
+				"url": "{{server}}/document/analyze",
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "logFile",
+							"description": "",
+							"type": "file",
+							"src": "server1.txt"
+						}
+					]
+				},
+				"description": ""
+			},
+			"response": []
+		}
+	]
+}
